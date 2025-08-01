@@ -1,0 +1,77 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: cooola-warehouse-management
+  
+  # データベース設定
+  datasource:
+    url: jdbc:mysql://localhost:3306/cooola_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: cooola_user
+    password: cooola_password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  
+  # JPA設定
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+        use_sql_comments: true
+  
+  # Flyway設定
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  
+  # セキュリティ設定
+  security:
+    user:
+      name: admin
+      password: admin123
+
+# JWT設定
+jwt:
+  secret: cooola-jwt-secret-key-2024-warehouse-management-system
+  expiration: 86400000 # 24時間
+
+# AWS設定
+aws:
+  region: ap-northeast-1
+  s3:
+    bucket-name: cooola-warehouse-files
+  sqs:
+    queue-url: https://sqs.ap-northeast-1.amazonaws.com/123456789012/cooola-warehouse-queue
+
+# ログ設定
+logging:
+  level:
+    com.cooola: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# 管理エンドポイント設定
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always 

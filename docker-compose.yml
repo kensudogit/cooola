@@ -1,0 +1,175 @@
+version: '3.8'
+
+services:
+  # MySQL データベース
+  mysql:
+    image: mysql:8.0
+    container_name: cooola-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: cooola_db
+      MYSQL_USER: cooola_user
+      MYSQL_PASSWORD: cooola_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
+    networks:
+      - cooola-network
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+
+  # Spring Boot バックエンド
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cooola-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cooola_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: cooola_user
+      SPRING_DATASOURCE_PASSWORD: cooola_password
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      - mysql
+    networks:
+      - cooola-network
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+      - /app/build
+      - /app/.gradle
+
+  # AngularJS フロントエンド
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cooola-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - API_BASE_URL=http://localhost:8080/api
+    depends_on:
+      - backend
+    networks:
+      - cooola-network
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  # phpMyAdmin (データベース管理)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: cooola-phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: cooola_user
+      PMA_PASSWORD: cooola_password
+    ports:
+      - "8081:80"
+    depends_on:
+      - mysql
+    networks:
+      - cooola-network
+    restart: unless-stopped
+
+  # Redis (キャッシュ・セッション管理)
+  redis:
+    image: redis:7-alpine
+    container_name: cooola-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cooola-network
+    restart: unless-stopped
+
+  # Elasticsearch (ログ管理・検索)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: cooola-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - cooola-network
+    restart: unless-stopped
+
+  # Kibana (ログ可視化)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: cooola-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - cooola-network
+    restart: unless-stopped
+
+  # Prometheus (メトリクス収集)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cooola-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - cooola-network
+    restart: unless-stopped
+
+  # Grafana (ダッシュボード)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cooola-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - cooola-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  cooola-network:
+    driver: bridge 

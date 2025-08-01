@@ -1,0 +1,322 @@
+<div class="container-fluid" ng-controller="ProductController">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa fa-cube"></i> 商品マスタ管理
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- 検索・フィルター -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <input type="text" class="form-control" placeholder="商品名、SKU、バーコードで検索..." 
+                                       ng-model="searchKeyword" ng-keyup="$event.keyCode === 13 && searchProducts()">
+                                <button class="btn btn-primary" type="button" ng-click="searchProducts()">
+                                    <i class="fa fa-search"></i> 検索
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#newProductModal">
+                                <i class="fa fa-plus"></i> 新規商品登録
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 商品一覧テーブル -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>SKU</th>
+                                    <th>商品名</th>
+                                    <th>カテゴリ</th>
+                                    <th>単位</th>
+                                    <th>重量</th>
+                                    <th>バーコード</th>
+                                    <th>ステータス</th>
+                                    <th>作成日</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr ng-repeat="product in products" ng-class="{'table-warning': !product.isActive}">
+                                    <td>
+                                        <strong>{{product.sku}}</strong>
+                                    </td>
+                                    <td>
+                                        <div>{{product.name}}</div>
+                                        <small class="text-muted" ng-if="product.description">{{product.description}}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info" ng-if="product.category">{{product.category.name}}</span>
+                                    </td>
+                                    <td>{{product.unitOfMeasure}}</td>
+                                    <td>
+                                        <span ng-if="product.weight">{{product.weight}} kg</span>
+                                        <span ng-if="!product.weight" class="text-muted">-</span>
+                                    </td>
+                                    <td>
+                                        <span ng-if="product.barcode">{{product.barcode}}</span>
+                                        <span ng-if="!product.barcode" class="text-muted">-</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success" ng-if="product.isActive">有効</span>
+                                        <span class="badge bg-secondary" ng-if="!product.isActive">無効</span>
+                                    </td>
+                                    <td>
+                                        <small>{{product.createdAt | date:'yyyy/MM/dd HH:mm'}}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" ng-click="startEdit(product)" title="編集">
+                                                <i class="fa fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" ng-click="deleteProduct(product)" title="削除">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr ng-if="products.length === 0">
+                                    <td colspan="9" class="text-center text-muted">
+                                        <i class="fa fa-info-circle"></i> 商品が見つかりません
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ページネーション -->
+                    <div class="row" ng-if="totalItems > pageSize">
+                        <div class="col-md-6">
+                            <small class="text-muted">
+                                全 {{totalItems}} 件中 {{(currentPage * pageSize) + 1}} - {{Math.min((currentPage + 1) * pageSize, totalItems)}} 件を表示
+                            </small>
+                        </div>
+                        <div class="col-md-6">
+                            <nav aria-label="商品一覧ページネーション">
+                                <ul class="pagination pagination-sm justify-content-end">
+                                    <li class="page-item" ng-class="{disabled: currentPage === 0}">
+                                        <a class="page-link" href="#" ng-click="changePage(currentPage - 1)">前へ</a>
+                                    </li>
+                                    <li class="page-item" ng-repeat="page in [] | range:Math.ceil(totalItems / pageSize)" 
+                                        ng-class="{active: page === currentPage}">
+                                        <a class="page-link" href="#" ng-click="changePage(page - 1)">{{page}}</a>
+                                    </li>
+                                    <li class="page-item" ng-class="{disabled: currentPage >= Math.ceil(totalItems / pageSize) - 1}">
+                                        <a class="page-link" href="#" ng-click="changePage(currentPage + 1)">次へ</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+
+                    <!-- ローディング -->
+                    <div class="text-center" ng-if="loading">
+                        <div class="loading-spinner"></div>
+                        <p class="text-muted">読み込み中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新規商品登録モーダル -->
+    <div class="modal fade" id="newProductModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fa fa-plus"></i> 新規商品登録
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form ng-submit="createProduct()">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">SKU *</label>
+                                    <input type="text" class="form-control" ng-model="newProduct.sku" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">商品名 *</label>
+                                    <input type="text" class="form-control" ng-model="newProduct.name" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">商品説明</label>
+                            <textarea class="form-control" rows="3" ng-model="newProduct.description"></textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">カテゴリ</label>
+                                    <select class="form-select" ng-model="newProduct.categoryId">
+                                        <option value="">カテゴリを選択</option>
+                                        <option ng-repeat="category in categories" value="{{category.id}}">
+                                            {{category.name}}
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">単位 *</label>
+                                    <input type="text" class="form-control" ng-model="newProduct.unitOfMeasure" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">重量 (kg)</label>
+                                    <input type="number" class="form-control" ng-model="newProduct.weight" step="0.001">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">サイズ</label>
+                                    <input type="text" class="form-control" ng-model="newProduct.dimensions" placeholder="例: 10x20x30cm">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">バーコード</label>
+                            <input type="text" class="form-control" ng-model="newProduct.barcode">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" ng-click="createProduct()">
+                        <i class="fa fa-save"></i> 登録
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 商品編集モーダル -->
+    <div class="modal fade" id="editProductModal" tabindex="-1" ng-if="editingProduct">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fa fa-edit"></i> 商品編集
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" ng-click="cancelEdit()"></button>
+                </div>
+                <div class="modal-body">
+                    <form ng-submit="updateProduct()">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">SKU *</label>
+                                    <input type="text" class="form-control" ng-model="editingProduct.sku" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">商品名 *</label>
+                                    <input type="text" class="form-control" ng-model="editingProduct.name" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">商品説明</label>
+                            <textarea class="form-control" rows="3" ng-model="editingProduct.description"></textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">カテゴリ</label>
+                                    <select class="form-select" ng-model="editingProduct.category.id">
+                                        <option value="">カテゴリを選択</option>
+                                        <option ng-repeat="category in categories" value="{{category.id}}">
+                                            {{category.name}}
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">単位 *</label>
+                                    <input type="text" class="form-control" ng-model="editingProduct.unitOfMeasure" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">重量 (kg)</label>
+                                    <input type="number" class="form-control" ng-model="editingProduct.weight" step="0.001">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">サイズ</label>
+                                    <input type="text" class="form-control" ng-model="editingProduct.dimensions" placeholder="例: 10x20x30cm">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">バーコード</label>
+                            <input type="text" class="form-control" ng-model="editingProduct.barcode">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" ng-click="cancelEdit()">キャンセル</button>
+                    <button type="button" class="btn btn-primary" ng-click="updateProduct()">
+                        <i class="fa fa-save"></i> 更新
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 編集モーダルを表示するためのディレクティブ
+angular.module('cooolaApp').directive('showEditModal', function() {
+    return {
+        restrict: 'A',
+        link: function(scope, element, attrs) {
+            scope.$watch('editingProduct', function(newVal) {
+                if (newVal) {
+                    $('#editProductModal').modal('show');
+                } else {
+                    $('#editProductModal').modal('hide');
+                }
+            });
+        }
+    };
+});
+
+// ページネーション用のフィルター
+angular.module('cooolaApp').filter('range', function() {
+    return function(input, total) {
+        total = parseInt(total);
+        for (var i = 1; i <= total; i++) {
+            input.push(i);
+        }
+        return input;
+    };
+});
+</script> 
