@@ -131,4 +131,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      */
     @Query("SELECT p FROM Product p WHERE p.isActive = true AND p.sku LIKE %:sku%")
     List<Product> findActiveBySkuContaining(@Param("sku") String sku);
+
+    /**
+     * アクティブ状態で商品数を取得するメソッド
+     * 
+     * @param isActive アクティブ状態（true: アクティブ、false: 非アクティブ）
+     * @return 指定状態の商品数
+     */
+    long countByIsActive(Boolean isActive);
 }

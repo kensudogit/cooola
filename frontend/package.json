@@ -1,67 +1,40 @@
 {
-  // COOOLa クラウド型倉庫管理システム - フロントエンド設定
-  // AngularJS 1.8.x + Bootstrap 5.x を使用したWebアプリケーション
   "name": "cooola-frontend",
   "version": "1.0.0",
   "description": "COOOLa クラウド型倉庫管理システム フロントエンド",
   "main": "index.js",
-  
-  // npmスクリプト定義
   "scripts": {
-    "start": "http-server -p 3000 -c-1",  // 開発サーバー起動（ポート3000、キャッシュ無効）
-    "build": "echo 'Build completed'",     // ビルドスクリプト（現在はダミー）
-    "test": "echo 'No tests specified'",   // テストスクリプト（現在はダミー）
-    "lint": "echo 'No linting configured'" // リントスクリプト（現在はダミー）
+    "start": "http-server -p 3000 -c-1",
+    "build": "echo 'Build completed'",
+    "test": "echo 'No tests specified'",
+    "lint": "echo 'No linting configured'"
   },
-  
-  // プロジェクトキーワード（npm検索用）
   "keywords": [
-    "warehouse",    // 倉庫管理
-    "management",   // 管理システム
-    "angularjs",    // AngularJSフレームワーク
-    "inventory"     // 在庫管理
+    "warehouse",
+    "management",
+    "angularjs",
+    "inventory"
   ],
-  
   "author": "COOOLa Team",
   "license": "MIT",
-  
-  // 開発依存関係（開発時のみ必要）
   "devDependencies": {
-    "http-server": "^14.1.1"  // 静的ファイルサーバー（開発用）
+    "http-server": "^14.1.1"
   },
-  
-  // 本番依存関係（アプリケーション実行に必要）
   "dependencies": {
-    // ========================================
-    // AngularJS コアライブラリ
-    // ========================================
-    "angular": "^1.8.3",           // AngularJS メインフレームワーク
-    "angular-route": "^1.8.3",     // ルーティング機能
-    "angular-sanitize": "^1.8.3",  // HTMLサニタイゼーション
-    "angular-animate": "^1.8.3",   // アニメーション機能
-    "angular-messages": "^1.8.3",  // メッセージ表示機能
-    "angular-cookies": "^1.8.3",   // Cookie管理機能
-    
-    // ========================================
-    // UI フレームワーク
-    // ========================================
-    "bootstrap": "^5.3.0",         // Bootstrap CSSフレームワーク
-    "jquery": "^3.7.0",            // jQuery（Bootstrap依存）
-    "popper.js": "^1.16.1",        // ポップオーバー機能（Bootstrap依存）
-    "font-awesome": "^4.7.0",      // アイコンフォント
-    
-    // ========================================
-    // AngularJS UI コンポーネント
-    // ========================================
-    "ng-table": "^0.0.14",         // テーブル表示コンポーネント
-    "angular-ui-bootstrap": "^2.5.6", // Bootstrap AngularJS連携
-    "angular-toastr": "^2.1.1",    // トースト通知コンポーネント
-    "angular-loading-bar": "^0.9.0", // ローディングバーコンポーネント
-    
-    // ========================================
-    // チャート・グラフ機能
-    // ========================================
-    "angular-chart.js": "^1.1.1",  // Chart.js AngularJS連携
-    "chart.js": "^3.9.1"           // チャート描画ライブラリ
+    "angular": "^1.8.3",
+    "angular-route": "^1.8.3",
+    "angular-sanitize": "^1.8.3",
+    "angular-animate": "^1.8.3",
+    "angular-messages": "^1.8.3",
+    "angular-cookies": "^1.8.3",
+    "bootstrap": "^5.3.0",
+    "jquery": "^3.7.0",
+    "popper.js": "^1.16.1",
+    "font-awesome": "^4.7.0",
+    "angular-ui-bootstrap": "^2.5.6",
+    "angular-toastr": "^2.1.1",
+    "angular-loading-bar": "^0.9.0",
+    "angular-chart.js": "^1.1.1",
+    "chart.js": "^3.9.1"
   }
 } 

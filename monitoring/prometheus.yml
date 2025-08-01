@@ -1,0 +1,56 @@
+# COOOLa クラウド型倉庫管理システム - Prometheus設定ファイル
+# このファイルはPrometheusの監視設定を定義します
+
+global:
+  scrape_interval: 15s  # スクレイプ間隔
+  evaluation_interval: 15s  # ルール評価間隔
+
+rule_files:
+  # アラートルールファイル（必要に応じて追加）
+  # - "alert_rules.yml"
+
+scrape_configs:
+  # Prometheus自身の監視
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # COOOLa バックエンドの監視
+  - job_name: 'cooola-backend'
+    static_configs:
+      - targets: ['backend:8080']
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 30s
+
+  # COOOLa フロントエンドの監視
+  - job_name: 'cooola-frontend'
+    static_configs:
+      - targets: ['frontend:3000']
+    scrape_interval: 30s
+
+  # MySQLの監視
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysql:3306']
+    scrape_interval: 30s
+
+  # Redisの監視
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+
+  # Elasticsearchの監視
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+    metrics_path: '/_prometheus/metrics'
+    scrape_interval: 30s
+
+# アラートマネージャーの設定
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # アラートマネージャーが設定されている場合
+          # - alertmanager:9093 

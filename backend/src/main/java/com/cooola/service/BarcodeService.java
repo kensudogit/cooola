@@ -2,7 +2,6 @@ package com.cooola.service;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
-import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.oned.Code128Writer;
@@ -13,7 +12,6 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -83,7 +81,7 @@ public class BarcodeService {
             ImageIO.write(image, "PNG", baos);
             return baos.toByteArray();
 
-        } catch (WriterException | IOException e) {
+        } catch (Exception e) {
             // エラーログを出力
             log.error("Error generating QR code: {}", e.getMessage());
             throw new RuntimeException("QRコードの生成に失敗しました", e);
@@ -137,7 +135,7 @@ public class BarcodeService {
             ImageIO.write(image, "PNG", baos);
             return baos.toByteArray();
 
-        } catch (WriterException | IOException e) {
+        } catch (Exception e) {
             // エラーログを出力
             log.error("Error generating barcode: {}", e.getMessage());
             throw new RuntimeException("バーコードの生成に失敗しました", e);

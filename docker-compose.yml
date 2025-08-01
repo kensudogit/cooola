@@ -1,7 +1,6 @@
 # COOOLa クラウド型倉庫管理システム - Docker Compose設定
 # このファイルは開発環境とプロダクション環境の両方で使用される
 # マイクロサービスアーキテクチャに基づいて設計されている
-version: '3.8'
 
 services:
   # MySQL データベース
@@ -16,7 +15,7 @@ services:
       MYSQL_USER: cooola_user            # アプリケーション用ユーザー
       MYSQL_PASSWORD: cooola_password    # アプリケーション用パスワード
     ports:
-      - "3306:3306"  # MySQLの標準ポート
+      - "3307:3306"  # MySQLの標準ポート（ホスト側を3307に変更）
     volumes:
       - mysql_data:/var/lib/mysql  # データの永続化
       - ./backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d  # 初期化SQLスクリプト
@@ -34,7 +33,7 @@ services:
       dockerfile: Dockerfile
     container_name: cooola-backend
     ports:
-      - "8080:8080"  # Spring Bootの標準ポート
+      - "8082:8080"  # Spring Bootの標準ポート（ホスト側を8082に変更）
     environment:
       # データベース接続設定
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cooola_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
@@ -60,9 +59,9 @@ services:
       dockerfile: Dockerfile
     container_name: cooola-frontend
     ports:
-      - "3000:3000"  # フロントエンドのポート
+      - "3002:3000"  # フロントエンドのポート（ホスト側を3002に変更）
     environment:
-      - API_BASE_URL=http://localhost:8080/api  # バックエンドAPIのベースURL
+      - API_BASE_URL=http://localhost:8082/api  # バックエンドAPIのベースURL
     depends_on:
       - backend  # バックエンドが起動してから起動
     networks:

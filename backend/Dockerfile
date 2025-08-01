@@ -11,9 +11,9 @@ WORKDIR /app
 
 # Gradle Wrapperをコピー
 # ビルドツールの設定ファイルをコンテナに配置
-COPY gradlew .                    # Gradle Wrapper実行スクリプト
-COPY gradle gradle               # Gradle Wrapper設定ディレクトリ
-COPY build.gradle .              # プロジェクトビルド設定
+COPY gradlew .
+COPY gradle gradle
+COPY build.gradle .
 
 # Gradle Wrapperに実行権限を付与
 # Linux環境でスクリプトを実行可能にする

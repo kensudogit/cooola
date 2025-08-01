@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 > nul
 echo ========================================
 echo COOOLa クラウド型倉庫管理システム
 echo ========================================
@@ -23,8 +22,8 @@ echo.
 echo ========================================
 echo サービスアクセス情報:
 echo ========================================
-echo フロントエンド: http://localhost:3002
-echo バックエンドAPI: http://localhost:8082/api
+echo フロントエンド: http://localhost:3000
+echo バックエンドAPI: http://localhost:8080/api
 echo phpMyAdmin: http://localhost:8081
 echo Grafana: http://localhost:3001 (admin/admin)
 echo Kibana: http://localhost:5601
