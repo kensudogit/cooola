@@ -1,78 +1,90 @@
+# COOOLa クラウド型倉庫管理システム - Docker Compose設定
+# このファイルは開発環境とプロダクション環境の両方で使用される
+# マイクロサービスアーキテクチャに基づいて設計されている
 version: '3.8'
 
 services:
   # MySQL データベース
+  # メインのデータストレージとして使用
+  # 商品、在庫、入出庫履歴などの重要なデータを保存
   mysql:
     image: mysql:8.0
     container_name: cooola-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: cooola_db
-      MYSQL_USER: cooola_user
-      MYSQL_PASSWORD: cooola_password
+      MYSQL_ROOT_PASSWORD: rootpassword  # ルートパスワード（本番環境では変更必須）
+      MYSQL_DATABASE: cooola_db          # データベース名
+      MYSQL_USER: cooola_user            # アプリケーション用ユーザー
+      MYSQL_PASSWORD: cooola_password    # アプリケーション用パスワード
     ports:
-      - "3306:3306"
+      - "3306:3306"  # MySQLの標準ポート
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
+      - mysql_data:/var/lib/mysql  # データの永続化
+      - ./backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d  # 初期化SQLスクリプト
     networks:
       - cooola-network
-    command: --default-authentication-plugin=mysql_native_password
-    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password  # 認証方式の設定
+    restart: unless-stopped  # コンテナの自動再起動
 
   # Spring Boot バックエンド
+  # RESTful APIを提供するメインのアプリケーションサーバー
+  # ビジネスロジックとデータベースアクセスを担当
   backend:
     build:
-      context: ./backend
+      context: ./backend  # ビルドコンテキスト
       dockerfile: Dockerfile
     container_name: cooola-backend
     ports:
-      - "8080:8080"
+      - "8080:8080"  # Spring Bootの標準ポート
     environment:
+      # データベース接続設定
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cooola_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: cooola_user
       SPRING_DATASOURCE_PASSWORD: cooola_password
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: docker  # Docker環境用のプロファイル
     depends_on:
-      - mysql
+      - mysql  # MySQLが起動してから起動
     networks:
       - cooola-network
     restart: unless-stopped
     volumes:
-      - ./backend:/app
-      - /app/build
-      - /app/.gradle
+      - ./backend:/app  # ソースコードのホットリロード用
+      - /app/build      # ビルド成果物の除外
+      - /app/.gradle    # Gradleキャッシュの除外
 
   # AngularJS フロントエンド
+  # ユーザーインターフェースを提供するWebアプリケーション
+  # 在庫管理、入出庫処理、レポート表示などの機能を提供
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: cooola-frontend
     ports:
-      - "3000:3000"
+      - "3000:3000"  # フロントエンドのポート
     environment:
-      - API_BASE_URL=http://localhost:8080/api
+      - API_BASE_URL=http://localhost:8080/api  # バックエンドAPIのベースURL
     depends_on:
-      - backend
+      - backend  # バックエンドが起動してから起動
     networks:
       - cooola-network
     restart: unless-stopped
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend:/app  # ソースコードのホットリロード用
+      - /app/node_modules  # node_modulesの除外
 
   # phpMyAdmin (データベース管理)
+  # データベースの管理・監視用Webインターフェース
+  # 開発・デバッグ時にデータベースの内容を確認するために使用
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
     container_name: cooola-phpmyadmin
     environment:
-      PMA_HOST: mysql
-      PMA_PORT: 3306
+      PMA_HOST: mysql      # MySQLホスト
+      PMA_PORT: 3306       # MySQLポート
       PMA_USER: cooola_user
       PMA_PASSWORD: cooola_password
     ports:
-      - "8081:80"
+      - "8081:80"  # phpMyAdminのWebインターフェース
     depends_on:
       - mysql
     networks:
@@ -80,41 +92,47 @@ services:
     restart: unless-stopped
 
   # Redis (キャッシュ・セッション管理)
+  # セッション管理、キャッシュ、メッセージキューとして使用
+  # パフォーマンス向上とスケーラビリティの向上に貢献
   redis:
     image: redis:7-alpine
     container_name: cooola-redis
     ports:
-      - "6379:6379"
+      - "6379:6379"  # Redisの標準ポート
     volumes:
-      - redis_data:/data
+      - redis_data:/data  # Redisデータの永続化
     networks:
       - cooola-network
     restart: unless-stopped
 
   # Elasticsearch (ログ管理・検索)
+  # アプリケーションログの収集・検索・分析
+  # 商品検索機能の高速化にも使用
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     container_name: cooola-elasticsearch
     environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - discovery.type=single-node  # シングルノードモード
+      - xpack.security.enabled=false  # セキュリティ無効化（開発環境）
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"  # JVMメモリ設定
     ports:
-      - "9200:9200"
+      - "9200:9200"  # Elasticsearch REST API
     volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
+      - elasticsearch_data:/usr/share/elasticsearch/data  # データの永続化
     networks:
       - cooola-network
     restart: unless-stopped
 
   # Kibana (ログ可視化)
+  # Elasticsearchのデータを可視化するダッシュボード
+  # ログ分析、監視、レポート作成に使用
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
     container_name: cooola-kibana
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200  # Elasticsearch接続設定
     ports:
-      - "5601:5601"
+      - "5601:5601"  # Kibana Webインターフェース
     depends_on:
       - elasticsearch
     networks:
@@ -122,54 +140,62 @@ services:
     restart: unless-stopped
 
   # Prometheus (メトリクス収集)
+  # アプリケーションのメトリクス（CPU、メモリ、レスポンス時間など）を収集
+  # システムの監視とアラート機能を提供
   prometheus:
     image: prom/prometheus:latest
     container_name: cooola-prometheus
     ports:
-      - "9090:9090"
+      - "9090:9090"  # Prometheus Web UI
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml  # 設定ファイル
+      - prometheus_data:/prometheus  # メトリクスデータの永続化
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
+      - '--config.file=/etc/prometheus/prometheus.yml'  # 設定ファイルの指定
+      - '--storage.tsdb.path=/prometheus'  # データ保存パス
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=200h'  # データ保持期間
+      - '--web.enable-lifecycle'  # ライフサイクル管理有効化
     networks:
       - cooola-network
     restart: unless-stopped
 
   # Grafana (ダッシュボード)
+  # Prometheusのメトリクスを可視化するダッシュボード
+  # システムの監視、アラート、レポート作成に使用
   grafana:
     image: grafana/grafana:latest
     container_name: cooola-grafana
     ports:
-      - "3001:3000"
+      - "3001:3000"  # Grafana Webインターフェース
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin  # 管理者パスワード（本番環境では変更必須）
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana  # Grafanaデータの永続化
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning  # プロビジョニング設定
     depends_on:
       - prometheus
     networks:
       - cooola-network
     restart: unless-stopped
 
+# 永続化ボリュームの定義
+# コンテナが削除されてもデータが保持される
 volumes:
-  mysql_data:
+  mysql_data:        # MySQLデータベースファイル
     driver: local
-  redis_data:
+  redis_data:        # Redisキャッシュデータ
     driver: local
-  elasticsearch_data:
+  elasticsearch_data: # Elasticsearchインデックスデータ
     driver: local
-  prometheus_data:
+  prometheus_data:   # Prometheusメトリクスデータ
     driver: local
-  grafana_data:
+  grafana_data:      # Grafanaダッシュボード設定
     driver: local
 
+# ネットワーク設定
+# 各サービス間の通信を管理
 networks:
-  cooola-network:
-    driver: bridge 
+  cooola-network:  # カスタムネットワーク
+    driver: bridge  # ブリッジネットワーク（デフォルト） 

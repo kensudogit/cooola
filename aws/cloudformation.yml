@@ -1,75 +1,107 @@
+# COOOLa クラウド型倉庫管理システム - AWS CloudFormation テンプレート
+# このテンプレートは本番環境用のAWSインフラストラクチャを定義します
+# マイクロサービスアーキテクチャに基づいて設計されています
+
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'COOOLa クラウド型倉庫管理システム AWS インフラストラクチャ'
 
+# ========================================
+# パラメータ定義
+# ========================================
 Parameters:
+  # 環境名（dev/staging/prod）
   Environment:
     Type: String
     Default: dev
     AllowedValues: [dev, staging, prod]
     Description: 環境名
   
+  # ドメイン名
   DomainName:
     Type: String
     Default: cooola.example.com
     Description: ドメイン名
 
+# ========================================
+# AWS リソース定義
+# ========================================
 Resources:
-  # VPC
+  # ========================================
+  # VPC（Virtual Private Cloud）
+  # ========================================
+  # アプリケーション全体のネットワーク基盤
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 10.0.0.0/16
-      EnableDnsHostnames: true
-      EnableDnsSupport: true
+      CidrBlock: 10.0.0.0/16  # VPCのIPアドレス範囲
+      EnableDnsHostnames: true  # DNSホスト名の有効化
+      EnableDnsSupport: true    # DNSサポートの有効化
       Tags:
         - Key: Name
           Value: !Sub '${Environment}-cooola-vpc'
 
+  # ========================================
   # パブリックサブネット
+  # ========================================
+  # インターネットから直接アクセス可能なサブネット
+  # ロードバランサーやNATゲートウェイを配置
+  
+  # パブリックサブネット1（AZ-a）
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [0, !GetAZs '']
-      MapPublicIpOnLaunch: true
+      CidrBlock: 10.0.1.0/24  # サブネットのIPアドレス範囲
+      AvailabilityZone: !Select [0, !GetAZs '']  # 最初のアベイラビリティゾーン
+      MapPublicIpOnLaunch: true  # パブリックIPの自動割り当て
       Tags:
         - Key: Name
           Value: !Sub '${Environment}-cooola-public-subnet-1'
 
+  # パブリックサブネット2（AZ-b）
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.2.0/24
-      AvailabilityZone: !Select [1, !GetAZs '']
-      MapPublicIpOnLaunch: true
+      CidrBlock: 10.0.2.0/24  # サブネットのIPアドレス範囲
+      AvailabilityZone: !Select [1, !GetAZs '']  # 2番目のアベイラビリティゾーン
+      MapPublicIpOnLaunch: true  # パブリックIPの自動割り当て
       Tags:
         - Key: Name
           Value: !Sub '${Environment}-cooola-public-subnet-2'
 
+  # ========================================
   # プライベートサブネット
+  # ========================================
+  # インターネットから直接アクセスできないサブネット
+  # アプリケーションサーバーやデータベースを配置
+  
+  # プライベートサブネット1（AZ-a）
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.3.0/24
-      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.3.0/24  # サブネットのIPアドレス範囲
+      AvailabilityZone: !Select [0, !GetAZs '']  # 最初のアベイラビリティゾーン
       Tags:
         - Key: Name
           Value: !Sub '${Environment}-cooola-private-subnet-1'
 
+  # プライベートサブネット2（AZ-b）
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.4.0/24
-      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.4.0/24  # サブネットのIPアドレス範囲
+      AvailabilityZone: !Select [1, !GetAZs '']  # 2番目のアベイラビリティゾーン
       Tags:
         - Key: Name
           Value: !Sub '${Environment}-cooola-private-subnet-2'
 
+  # ========================================
   # インターネットゲートウェイ
+  # ========================================
+  # VPCとインターネットを接続するゲートウェイ
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -77,31 +109,41 @@ Resources:
         - Key: Name
           Value: !Sub '${Environment}-cooola-igw'
 
-  # VPCアタッチメント
+  # VPCとインターネットゲートウェイの接続
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
 
-  # NATゲートウェイ用EIP
+  # ========================================
+  # NATゲートウェイ
+  # ========================================
+  # プライベートサブネットからインターネットへのアクセスを提供
+  
+  # NATゲートウェイ用のElastic IP
   NATGatewayEIP:
     Type: AWS::EC2::EIP
-    DependsOn: InternetGatewayAttachment
+    DependsOn: InternetGatewayAttachment  # インターネットゲートウェイ接続後に作成
     Properties:
-      Domain: vpc
+      Domain: vpc  # VPC用のEIP
 
   # NATゲートウェイ
   NATGateway:
     Type: AWS::EC2::NatGateway
     Properties:
-      AllocationId: !GetAtt NATGatewayEIP.AllocationId
-      SubnetId: !Ref PublicSubnet1
+      AllocationId: !GetAtt NATGatewayEIP.AllocationId  # EIPの割り当てID
+      SubnetId: !Ref PublicSubnet1  # パブリックサブネットに配置
       Tags:
         - Key: Name
           Value: !Sub '${Environment}-cooola-nat-gateway'
 
+  # ========================================
   # ルートテーブル
+  # ========================================
+  # サブネットとインターネットゲートウェイを接続するルートテーブル
+  
+  # パブリックルートテーブル
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -110,6 +152,7 @@ Resources:
         - Key: Name
           Value: !Sub '${Environment}-cooola-public-rt'
 
+  # プライベートルートテーブル
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -118,52 +161,69 @@ Resources:
         - Key: Name
           Value: !Sub '${Environment}-cooola-private-rt'
 
+  # ========================================
   # ルート
+  # ========================================
+  # ルートテーブルにルートを追加
+  
+  # パブリックルート
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
     Properties:
       RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
+      DestinationCidrBlock: 0.0.0.0/0  # すべてのIPアドレスへのルート
+      GatewayId: !Ref InternetGateway  # インターネットゲートウェイを経由
 
+  # プライベートルート
   PrivateRoute:
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref PrivateRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NATGateway
+      DestinationCidrBlock: 0.0.0.0/0  # すべてのIPアドレスへのルート
+      NatGatewayId: !Ref NATGateway  # NATゲートウェイを経由
 
+  # ========================================
   # ルートテーブルアソシエーション
+  # ========================================
+  # サブネットとルートテーブルを関連付け
+  
+  # パブリックサブネット1ルートテーブルアソシエーション
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet1
       RouteTableId: !Ref PublicRouteTable
 
+  # パブリックサブネット2ルートテーブルアソシエーション
   PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet2
       RouteTableId: !Ref PublicRouteTable
 
+  # プライベートサブネット1ルートテーブルアソシエーション
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PrivateSubnet1
       RouteTableId: !Ref PrivateRouteTable
 
+  # プライベートサブネット2ルートテーブルアソシエーション
   PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PrivateSubnet2
       RouteTableId: !Ref PrivateRouteTable
 
+  # ========================================
   # RDS サブネットグループ
+  # ========================================
+  # データベースインスタンスを配置するサブネットグループ
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: COOOLa Database Subnet Group
+      DBSubnetGroupDescription: COOOLa Database Subnet Group  # データベースサブネットグループの説明
       SubnetIds:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
@@ -171,410 +231,484 @@ Resources:
         - Key: Name
           Value: !Sub '${Environment}-cooola-db-subnet-group'
 
+  # ========================================
   # RDS パラメータグループ
+  # ========================================
+  # データベースインスタンスのパラメータを定義
   DBParameterGroup:
     Type: AWS::RDS::DBParameterGroup
     Properties:
-      Description: COOOLa MySQL Parameter Group
-      Family: mysql8.0
+      Description: COOOLa MySQL Parameter Group  # パラメータグループの説明
+      Family: mysql8.0  # パラメータグループのファミリー
       Parameters:
-        character_set_server: utf8mb4
-        collation_server: utf8mb4_unicode_ci
-        time_zone: Asia/Tokyo
+        character_set_server: utf8mb4  # 文字セット
+        collation_server: utf8mb4_unicode_ci  # 照合順序
+        time_zone: Asia/Tokyo  # タイムゾーン
 
+  # ========================================
   # RDS インスタンス
+  # ========================================
+  # データベースインスタンスの定義
   Database:
     Type: AWS::RDS::DBInstance
     Properties:
-      DBInstanceIdentifier: !Sub '${Environment}-cooola-db'
-      DBInstanceClass: db.t3.micro
-      Engine: mysql
-      EngineVersion: '8.0'
-      MasterUsername: cooola_user
-      MasterUserPassword: !Sub '{{resolve:secretsmanager:${Environment}/cooola/db:SecretString:password}}'
-      AllocatedStorage: 20
-      StorageType: gp2
-      StorageEncrypted: true
-      DBSubnetGroupName: !Ref DBSubnetGroup
-      DBParameterGroupName: !Ref DBParameterGroup
-      BackupRetentionPeriod: 7
-      MultiAZ: false
-      PubliclyAccessible: false
+      DBInstanceIdentifier: !Sub '${Environment}-cooola-db'  # インスタンス識別子
+      DBInstanceClass: db.t3.micro  # インスタンスクラス
+      Engine: mysql  # エンジン
+      EngineVersion: '8.0'  # エンジンバージョン
+      MasterUsername: cooola_user  # マスターユーザー名
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${Environment}/cooola/db:SecretString:password}}'  # マスターユーザーパスワード
+      AllocatedStorage: 20  # 割り当てストレージ
+      StorageType: gp2  # ストレージタイプ
+      StorageEncrypted: true  # ストレージ暗号化
+      DBSubnetGroupName: !Ref DBSubnetGroup  # サブネットグループ
+      DBParameterGroupName: !Ref DBParameterGroup  # パラメータグループ
+      BackupRetentionPeriod: 7  # バックアップ保持期間
+      MultiAZ: false  # マルチAZ
+      PubliclyAccessible: false  # パブリックアクセス
       VPCSecurityGroups:
-        - !Ref DatabaseSecurityGroup
+        - !Ref DatabaseSecurityGroup  # データベースセキュリティグループ
       Tags:
         - Key: Name
-          Value: !Sub '${Environment}-cooola-database'
+          Value: !Sub '${Environment}-cooola-database'  # インスタンスのタグ
 
+  # ========================================
   # データベースセキュリティグループ
+  # ========================================
+  # データベースインスタンスのセキュリティグループ
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: COOOLa Database Security Group
+      GroupDescription: COOOLa Database Security Group  # セキュリティグループの説明
       VpcId: !Ref VPC
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          SourceSecurityGroupId: !Ref ApplicationSecurityGroup
+        - IpProtocol: tcp  # プロトコル
+          FromPort: 3306  # ポート
+          ToPort: 3306  # ポート
+          SourceSecurityGroupId: !Ref ApplicationSecurityGroup  # ソースセキュリティグループ
 
+  # ========================================
   # アプリケーションセキュリティグループ
+  # ========================================
+  # アプリケーションサーバーのセキュリティグループ
   ApplicationSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: COOOLa Application Security Group
+      GroupDescription: COOOLa Application Security Group  # セキュリティグループの説明
       VpcId: !Ref VPC
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp  # プロトコル
+          FromPort: 80  # ポート
+          ToPort: 80  # ポート
+          CidrIp: 0.0.0.0/0  # ソースIP
+        - IpProtocol: tcp  # プロトコル
+          FromPort: 443  # ポート
+          ToPort: 443  # ポート
+          CidrIp: 0.0.0.0/0  # ソースIP
+        - IpProtocol: tcp  # プロトコル
+          FromPort: 8080  # ポート
+          ToPort: 8080  # ポート
+          CidrIp: 0.0.0.0/0  # ソースIP
 
+  # ========================================
   # S3 バケット
+  # ========================================
+  # アプリケーションの静的ファイルやログを保存するバケット
   StorageBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${Environment}-cooola-storage-${AWS::AccountId}'
+      BucketName: !Sub '${Environment}-cooola-storage-${AWS::AccountId}'  # バケット名
       VersioningConfiguration:
-        Status: Enabled
+        Status: Enabled  # バージョニング有効化
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
+              SSEAlgorithm: AES256  # サーバーサイド暗号化アルゴリズム
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+        BlockPublicAcls: true  # パブリックACLのブロック
+        BlockPublicPolicy: true  # パブリックポリシーのブロック
+        IgnorePublicAcls: true  # パブリックACLの無視
+        RestrictPublicBuckets: true  # パブリックバケットの制限
       Tags:
         - Key: Name
-          Value: !Sub '${Environment}-cooola-storage'
+          Value: !Sub '${Environment}-cooola-storage'  # バケットのタグ
 
+  # ========================================
   # CloudFront ディストリビューション
+  # ========================================
+  # コンテンツを配信するためのCloudFrontディストリビューション
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Origins:
-          - Id: S3Origin
-            DomainName: !GetAtt StorageBucket.RegionalDomainName
+          - Id: S3Origin  # オリジンの識別子
+            DomainName: !GetAtt StorageBucket.RegionalDomainName  # S3バケットのオリジンドメイン
             S3OriginConfig:
-              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
-        Enabled: true
-        DefaultRootObject: index.html
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'  # CloudFront OAIのARN
+        Enabled: true  # ディストリビューションの有効化
+        DefaultRootObject: index.html  # デフォルトのルートオブジェクト
         DefaultCacheBehavior:
-          TargetOriginId: S3Origin
-          ViewerProtocolPolicy: redirect-to-https
+          TargetOriginId: S3Origin  # ターゲットオリジンの識別子
+          ViewerProtocolPolicy: redirect-to-https  # ビューアープロトコルポリシー
           AllowedMethods:
-            - GET
-            - HEAD
-            - OPTIONS
+            - GET  # 許可メソッド
+            - HEAD  # 許可メソッド
+            - OPTIONS  # 許可メソッド
           CachedMethods:
-            - GET
-            - HEAD
+            - GET  # キャッシュメソッド
+            - HEAD  # キャッシュメソッド
           ForwardedValues:
-            QueryString: false
+            QueryString: false  # クエリ文字列の転送
             Cookies:
-              Forward: none
-          MinTTL: 0
-          DefaultTTL: 86400
-          MaxTTL: 31536000
-        PriceClass: PriceClass_100
+              Forward: none  # クッキーの転送
+          MinTTL: 0  # 最小TTL
+          DefaultTTL: 86400  # デフォルトTTL
+          MaxTTL: 31536000  # 最大TTL
+        PriceClass: PriceClass_100  # 価格クラス
         ViewerCertificate:
-          CloudFrontDefaultCertificate: true
+          CloudFrontDefaultCertificate: true  # デフォルトのビューアー証明書
 
+  # ========================================
   # CloudFront OAI
+  # ========================================
+  # CloudFrontがS3バケットにアクセスするためのOAI
   CloudFrontOAI:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub '${Environment}-cooola-oai'
+        Comment: !Sub '${Environment}-cooola-oai'  # OAIのコメント
 
+  # ========================================
   # S3 バケットポリシー
+  # ========================================
+  # S3バケットへのアクセスをCloudFrontに制限するポリシー
   StorageBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Ref StorageBucket
       PolicyDocument:
         Statement:
-          - Effect: Allow
+          - Effect: Allow  # 効果
             Principal:
-              AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}'
-            Action: s3:GetObject
-            Resource: !Sub '${StorageBucket}/*'
+              AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}'  # CloudFront OAIのARN
+            Action: s3:GetObject  # アクション
+            Resource: !Sub '${StorageBucket}/*'  # リソース
 
+  # ========================================
   # ECS クラスター
+  # ========================================
+  # コンテナオーケストレーションサービスのクラスター
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Sub '${Environment}-cooola-cluster'
+      ClusterName: !Sub '${Environment}-cooola-cluster'  # クラスター名
       CapacityProviders:
-        - FARGATE
-        - FARGATE_SPOT
+        - FARGATE  # FARGATEプロバイダー
+        - FARGATE_SPOT  # FARGATE_SPOTプロバイダー
       DefaultCapacityProviderStrategy:
-        - CapacityProvider: FARGATE
-          Weight: 1
+        - CapacityProvider: FARGATE  # プロバイダー
+          Weight: 1  # 重み
 
+  # ========================================
   # ECS タスク定義 - バックエンド
+  # ========================================
+  # バックエンドサービスのタスク定義
   BackendTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub '${Environment}-cooola-backend'
-      NetworkMode: awsvpc
+      Family: !Sub '${Environment}-cooola-backend'  # タスク定義のファミリー
+      NetworkMode: awsvpc  # ネットワークモード
       RequiresCompatibilities:
-        - FARGATE
-      Cpu: 256
-      Memory: 512
-      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
-      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+        - FARGATE  # 互換性
+      Cpu: 256  # CPU
+      Memory: 512  # メモリ
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn  # 実行ロールのARN
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn  # タスクロールのARN
       ContainerDefinitions:
-        - Name: backend
-          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/cooola-backend:latest'
+        - Name: backend  # コンテナ名
+          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/cooola-backend:latest'  # イメージ
           PortMappings:
-            - ContainerPort: 8080
+            - ContainerPort: 8080  # コンテナポート
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: !Ref Environment
+              Value: !Ref Environment  # 環境
             - Name: SPRING_DATASOURCE_URL
-              Value: !Sub 'jdbc:mysql://${Database.Endpoint.Address}:${Database.Endpoint.Port}/cooola_db'
+              Value: !Sub 'jdbc:mysql://${Database.Endpoint.Address}:${Database.Endpoint.Port}/cooola_db'  # データベースURL
             - Name: SPRING_DATASOURCE_USERNAME
-              Value: cooola_user
+              Value: cooola_user  # ユーザー名
             - Name: SPRING_DATASOURCE_PASSWORD
-              Value: !Sub '{{resolve:secretsmanager:${Environment}/cooola/db:SecretString:password}}'
+              Value: !Sub '{{resolve:secretsmanager:${Environment}/cooola/db:SecretString:password}}'  # パスワード
           LogConfiguration:
-            LogDriver: awslogs
+            LogDriver: awslogs  # ログドライバー
             Options:
-              awslogs-group: !Ref BackendLogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: backend
+              awslogs-group: !Ref BackendLogGroup  # ロググループ
+              awslogs-region: !Ref AWS::Region  # リージョン
+              awslogs-stream-prefix: backend  # ストリームプレフィックス
 
+  # ========================================
   # ECS タスク定義 - フロントエンド
+  # ========================================
+  # フロントエンドサービスのタスク定義
   FrontendTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub '${Environment}-cooola-frontend'
-      NetworkMode: awsvpc
+      Family: !Sub '${Environment}-cooola-frontend'  # タスク定義のファミリー
+      NetworkMode: awsvpc  # ネットワークモード
       RequiresCompatibilities:
-        - FARGATE
-      Cpu: 256
-      Memory: 512
-      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+        - FARGATE  # 互換性
+      Cpu: 256  # CPU
+      Memory: 512  # メモリ
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn  # 実行ロールのARN
       ContainerDefinitions:
-        - Name: frontend
-          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/cooola-frontend:latest'
+        - Name: frontend  # コンテナ名
+          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/cooola-frontend:latest'  # イメージ
           PortMappings:
-            - ContainerPort: 3000
+            - ContainerPort: 3000  # コンテナポート
           Environment:
             - Name: API_BASE_URL
-              Value: !Sub 'https://${BackendLoadBalancer.DNSName}'
+              Value: !Sub 'https://${BackendLoadBalancer.DNSName}'  # バックエンドロードバランサーのDNS名
           LogConfiguration:
-            LogDriver: awslogs
+            LogDriver: awslogs  # ログドライバー
             Options:
-              awslogs-group: !Ref FrontendLogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: frontend
+              awslogs-group: !Ref FrontendLogGroup  # ロググループ
+              awslogs-region: !Ref AWS::Region  # リージョン
+              awslogs-stream-prefix: frontend  # ストリームプレフィックス
 
+  # ========================================
   # ECS サービス - バックエンド
+  # ========================================
+  # バックエンドサービスのECSサービス
   BackendService:
     Type: AWS::ECS::Service
     Properties:
-      ServiceName: !Sub '${Environment}-cooola-backend'
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref BackendTaskDefinition
-      DesiredCount: 2
-      LaunchType: FARGATE
+      ServiceName: !Sub '${Environment}-cooola-backend'  # サービス名
+      Cluster: !Ref ECSCluster  # クラスター
+      TaskDefinition: !Ref BackendTaskDefinition  # タスク定義
+      DesiredCount: 2  # 希望数
+      LaunchType: FARGATE  # 起動タイプ
       NetworkConfiguration:
         AwsvpcConfiguration:
           SecurityGroups:
-            - !Ref ApplicationSecurityGroup
+            - !Ref ApplicationSecurityGroup  # アプリケーションセキュリティグループ
           Subnets:
-            - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-          AssignPublicIp: DISABLED
+            - !Ref PrivateSubnet1  # プライベートサブネット1
+            - !Ref PrivateSubnet2  # プライベートサブネット2
+          AssignPublicIp: DISABLED  # パブリックIPの割り当て
       LoadBalancers:
-        - ContainerName: backend
-          ContainerPort: 8080
-          TargetGroupArn: !Ref BackendTargetGroup
+        - ContainerName: backend  # コンテナ名
+          ContainerPort: 8080  # コンテナポート
+          TargetGroupArn: !Ref BackendTargetGroup  # ターゲットグループ
 
+  # ========================================
   # ECS サービス - フロントエンド
+  # ========================================
+  # フロントエンドサービスのECSサービス
   FrontendService:
     Type: AWS::ECS::Service
     Properties:
-      ServiceName: !Sub '${Environment}-cooola-frontend'
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref FrontendTaskDefinition
-      DesiredCount: 2
-      LaunchType: FARGATE
+      ServiceName: !Sub '${Environment}-cooola-frontend'  # サービス名
+      Cluster: !Ref ECSCluster  # クラスター
+      TaskDefinition: !Ref FrontendTaskDefinition  # タスク定義
+      DesiredCount: 2  # 希望数
+      LaunchType: FARGATE  # 起動タイプ
       NetworkConfiguration:
         AwsvpcConfiguration:
           SecurityGroups:
-            - !Ref ApplicationSecurityGroup
+            - !Ref ApplicationSecurityGroup  # アプリケーションセキュリティグループ
           Subnets:
-            - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-          AssignPublicIp: DISABLED
+            - !Ref PrivateSubnet1  # プライベートサブネット1
+            - !Ref PrivateSubnet2  # プライベートサブネット2
+          AssignPublicIp: DISABLED  # パブリックIPの割り当て
       LoadBalancers:
-        - ContainerName: frontend
-          ContainerPort: 3000
-          TargetGroupArn: !Ref FrontendTargetGroup
+        - ContainerName: frontend  # コンテナ名
+          ContainerPort: 3000  # コンテナポート
+          TargetGroupArn: !Ref FrontendTargetGroup  # ターゲットグループ
 
+  # ========================================
   # Application Load Balancer
+  # ========================================
+  # アプリケーショントラフィックを負荷分散するロードバランサー
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub '${Environment}-cooola-alb'
-      Scheme: internet-facing
-      Type: application
+      Name: !Sub '${Environment}-cooola-alb'  # ロードバランサー名
+      Scheme: internet-facing  # スキーム
+      Type: application  # タイプ
       SecurityGroups:
-        - !Ref ApplicationSecurityGroup
+        - !Ref ApplicationSecurityGroup  # アプリケーションセキュリティグループ
       Subnets:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !Ref PublicSubnet1  # パブリックサブネット1
+        - !Ref PublicSubnet2  # パブリックサブネット2
 
+  # ========================================
   # バックエンドターゲットグループ
+  # ========================================
+  # バックエンドサービスのターゲットグループ
   BackendTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub '${Environment}-cooola-backend-tg'
-      Port: 8080
-      Protocol: HTTP
-      VpcId: !Ref VPC
-      TargetType: ip
-      HealthCheckPath: /api/health
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 3
+      Name: !Sub '${Environment}-cooola-backend-tg'  # ターゲットグループ名
+      Port: 8080  # ポート
+      Protocol: HTTP  # プロトコル
+      VpcId: !Ref VPC  # VPC
+      TargetType: ip  # ターゲットタイプ
+      HealthCheckPath: /api/health  # ヘルスチェックパス
+      HealthCheckIntervalSeconds: 30  # ヘルスチェック間隔
+      HealthCheckTimeoutSeconds: 5  # ヘルスチェックタイムアウト
+      HealthyThresholdCount: 2  # 正常しきい値
+      UnhealthyThresholdCount: 3  # 異常しきい値
 
+  # ========================================
   # フロントエンドターゲットグループ
+  # ========================================
+  # フロントエンドサービスのターゲットグループ
   FrontendTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub '${Environment}-cooola-frontend-tg'
-      Port: 3000
-      Protocol: HTTP
-      VpcId: !Ref VPC
-      TargetType: ip
-      HealthCheckPath: /
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 3
+      Name: !Sub '${Environment}-cooola-frontend-tg'  # ターゲットグループ名
+      Port: 3000  # ポート
+      Protocol: HTTP  # プロトコル
+      VpcId: !Ref VPC  # VPC
+      TargetType: ip  # ターゲットタイプ
+      HealthCheckPath: /  # ヘルスチェックパス
+      HealthCheckIntervalSeconds: 30  # ヘルスチェック間隔
+      HealthCheckTimeoutSeconds: 5  # ヘルスチェックタイムアウト
+      HealthyThresholdCount: 2  # 正常しきい値
+      UnhealthyThresholdCount: 3  # 異常しきい値
 
+  # ========================================
   # リスナー
+  # ========================================
+  # ロードバランサーにリスナーを追加
+  
+  # バックエンドリスナー
   BackendListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 8080
-      Protocol: HTTP
+      LoadBalancerArn: !Ref ApplicationLoadBalancer  # ロードバランサーのARN
+      Port: 8080  # ポート
+      Protocol: HTTP  # プロトコル
       DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref BackendTargetGroup
+        - Type: forward  # アクションタイプ
+          TargetGroupArn: !Ref BackendTargetGroup  # ターゲットグループ
 
+  # フロントエンドリスナー
   FrontendListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
+      LoadBalancerArn: !Ref ApplicationLoadBalancer  # ロードバランサーのARN
+      Port: 80  # ポート
+      Protocol: HTTP  # プロトコル
       DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref FrontendTargetGroup
+        - Type: forward  # アクションタイプ
+          TargetGroupArn: !Ref FrontendTargetGroup  # ターゲットグループ
 
+  # ========================================
   # CloudWatch ロググループ
+  # ========================================
+  # ログを保存するCloudWatchロググループ
+  
+  # バックエンドロググループ
   BackendLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/ecs/${Environment}-cooola-backend'
-      RetentionInDays: 30
+      LogGroupName: !Sub '/ecs/${Environment}-cooola-backend'  # ロググループ名
+      RetentionInDays: 30  # 保持期間
 
+  # フロントエンドロググループ
   FrontendLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/ecs/${Environment}-cooola-frontend'
-      RetentionInDays: 30
+      LogGroupName: !Sub '/ecs/${Environment}-cooola-frontend'  # ロググループ名
+      RetentionInDays: 30  # 保持期間
 
+  # ========================================
   # IAM ロール
+  # ========================================
+  # ECSタスクがリソースにアクセスするためのIAMロール
+  
+  # ECSタスク実行ロール
   ECSTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${Environment}-cooola-ecs-task-execution-role'
+      RoleName: !Sub '${Environment}-cooola-ecs-task-execution-role'  # ロール名
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: '2012-10-17'  # ポリシーバージョン
         Statement:
-          - Effect: Allow
+          - Effect: Allow  # 効果
             Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
+              Service: ecs-tasks.amazonaws.com  # サービス
+            Action: sts:AssumeRole  # アクション
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy  # マネージドポリシー
       Policies:
-        - PolicyName: SecretsAccess
+        - PolicyName: SecretsAccess  # ポリシー名
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: '2012-10-17'  # ポリシーバージョン
             Statement:
-              - Effect: Allow
+              - Effect: Allow  # 効果
                 Action:
-                  - secretsmanager:GetSecretValue
-                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/cooola/*'
+                  - secretsmanager:GetSecretValue  # アクション
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/cooola/*'  # リソース
 
+  # ECSタスクロール
   ECSTaskRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${Environment}-cooola-ecs-task-role'
+      RoleName: !Sub '${Environment}-cooola-ecs-task-role'  # ロール名
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: '2012-10-17'  # ポリシーバージョン
         Statement:
-          - Effect: Allow
+          - Effect: Allow  # 効果
             Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
+              Service: ecs-tasks.amazonaws.com  # サービス
+            Action: sts:AssumeRole  # アクション
       Policies:
-        - PolicyName: S3Access
+        - PolicyName: S3Access  # ポリシー名
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: '2012-10-17'  # ポリシーバージョン
             Statement:
-              - Effect: Allow
+              - Effect: Allow  # 効果
                 Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                  - s3:DeleteObject
-                Resource: !Sub '${StorageBucket}/*'
+                  - s3:GetObject  # アクション
+                  - s3:PutObject  # アクション
+                  - s3:DeleteObject  # アクション
+                Resource: !Sub '${StorageBucket}/*'  # リソース
 
+# ========================================
+# 出力
+# ========================================
 Outputs:
+  # VPC ID
   VPCId:
     Description: VPC ID
     Value: !Ref VPC
     Export:
       Name: !Sub '${Environment}-cooola-vpc-id'
 
+  # データベースエンドポイント
   DatabaseEndpoint:
     Description: Database Endpoint
     Value: !GetAtt Database.Endpoint.Address
     Export:
       Name: !Sub '${Environment}-cooola-db-endpoint'
 
+  # S3ストレージバケット名
   StorageBucketName:
     Description: S3 Storage Bucket Name
     Value: !Ref StorageBucket
     Export:
       Name: !Sub '${Environment}-cooola-storage-bucket'
 
+  # ロードバランサーDNS
   LoadBalancerDNS:
     Description: Application Load Balancer DNS Name
     Value: !GetAtt ApplicationLoadBalancer.DNSName
     Export:
       Name: !Sub '${Environment}-cooola-alb-dns'
 
+  # ECSクラスター名
   ECSClusterName:
     Description: ECS Cluster Name
     Value: !Ref ECSCluster
